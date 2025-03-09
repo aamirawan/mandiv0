@@ -226,24 +226,36 @@ function ProductsList({ view }: ProductsListProps) {
 }
 
 const getProductImage = (product: Product) => {
-  // If there's an image object from Supabase, use it
-  if (product.images && Array.isArray(product.images) && product.images.length > 0) {
-    return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images/${product.images[0]}`
+  // If product has no image data, use placeholder based on category
+  if (!product.image && (!product.images || !product.images.length)) {
+    const placeholders: Record<string, string> = {
+      'Rice': '/placeholders/rice.jpg',
+      'Wheat': '/placeholders/wheat.jpg',
+      'Corn': '/placeholders/corn.jpg',
+      'Spices': '/placeholders/spices.jpg'
+    }
+    
+    return placeholders[product.category] || '/placeholders/rice.jpg'
   }
-  
-  // If there's a specific image path
-  if (product.image) {
+
+  // If image is a full URL already (including Public URL from Supabase), use it directly
+  if (product.image && (product.image.startsWith('http') || product.image.startsWith('/'))) {
     return product.image
   }
   
-  // Otherwise use placeholder based on category
-  const placeholders: Record<string, string> = {
-    'Rice': '/placeholders/rice.jpg',
-    'Wheat': '/placeholders/wheat.jpg',
-    'Corn': '/placeholders/corn.jpg',
-    'Spices': '/placeholders/spices.jpg'
+  // If image is a filename from Supabase storage, build the full URL
+  if (product.image) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+    return `${supabaseUrl}/storage/v1/object/public/product-images/${product.image}`
   }
   
-  return placeholders[product.category] || '/placeholder.svg'
+  // Legacy support for images array (if still in use)
+  if (product.images && Array.isArray(product.images) && product.images.length > 0) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+    return `${supabaseUrl}/storage/v1/object/public/product-images/${product.images[0]}`
+  }
+  
+  // Final fallback
+  return '/placeholders/rice.jpg'
 }
 

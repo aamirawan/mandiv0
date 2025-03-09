@@ -67,33 +67,80 @@ export default function AddProductPage() {
         ...productData,
         price: parseFloat(productData.price),
         stock: parseInt(productData.stock),
-        images: [] as string[]
+        image: '',  // Add default empty image field
+        unit: productData.unit || 'kg'  // Ensure unit has a default value
       }
 
       // Handle file upload if a file is selected
       if (selectedFile) {
-        // Create a unique file name
-        const fileExt = selectedFile.name.split('.').pop()
-        const fileName = `${Date.now()}.${fileExt}`
-        
-        // Upload to Supabase Storage
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('product-images')
-          .upload(fileName, selectedFile)
-        
-        if (uploadError) {
-          throw uploadError
+        try {
+          console.log('Uploading file:', selectedFile.name)
+          
+          // Check if bucket exists first
+          const { data: buckets, error: bucketError } = await supabase.storage.listBuckets()
+          if (bucketError) {
+            console.error('Error listing buckets:', bucketError)
+            throw new Error('Unable to access storage: ' + bucketError.message)
+          }
+          
+          const bucketExists = buckets.some(bucket => bucket.name === 'product-images')
+          if (!bucketExists) {
+            console.error('Bucket product-images does not exist')
+            throw new Error('Storage bucket not found. Please create a bucket named "product-images" in your Supabase project.')
+          }
+          
+          // Create a unique file name
+          const fileExt = selectedFile.name.split('.').pop()
+          const fileName = `${Date.now()}.${fileExt}`
+          
+          // Upload to Supabase Storage
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('product-images')
+            .upload(fileName, selectedFile)
+          
+          if (uploadError) {
+            console.error('File upload error:', uploadError)
+            throw new Error('Failed to upload image: ' + uploadError.message)
+          }
+          
+          console.log('File uploaded successfully:', uploadData)
+          
+          // Get public URL for the uploaded file
+          const { data: urlData } = supabase.storage
+            .from('product-images')
+            .getPublicUrl(fileName)
+            
+          // Add image to the product data
+          product.image = urlData.publicUrl
+        } catch (uploadErr: any) {
+          console.error('Upload process error:', uploadErr)
+          toast({
+            title: 'Upload Error',
+            description: uploadErr.message || 'Failed to upload image',
+            variant: 'destructive',
+          })
+          // Continue without image rather than failing the whole product creation
+          product.image = ''
+        }
+      } else {
+        // If no image uploaded, use a placeholder based on category
+        const categoryMap: Record<string, string> = {
+          'Rice': '/placeholders/rice.jpg',
+          'Wheat': '/placeholders/wheat.jpg',
+          'Corn': '/placeholders/corn.jpg',
+          'Spices': '/placeholders/spices.jpg'
         }
         
-        // Add image to the product data
-        product.images = [fileName]
+        product.image = categoryMap[product.category] || '/placeholders/rice.jpg'
       }
+      
+      console.log('Creating product with data:', product)
       
       // Create product in the database
       const newProduct = await createProduct(product)
       
       if (!newProduct) {
-        throw new Error('Failed to create product')
+        throw new Error('Failed to create product. Database operation returned null.')
       }
       
       toast({
