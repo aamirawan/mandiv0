@@ -1,215 +1,226 @@
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Edit, Gavel, MoreVertical, Plus, Trash } from "lucide-react"
-import Image from "next/image"
-import Link from "next/link"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { getProducts } from "@/lib/supabase-service"
-import { Suspense } from "react"
+'use client'
+
+import { useState, useEffect } from 'react'
+import Link from 'next/link'
+import Image from 'next/image'
+import { Edit, Gavel, Plus, MoreVertical } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { useRouter } from 'next/navigation'
+import { getProducts } from '@/lib/supabase-service'
+
+// Define a Product interface
+interface Product {
+  id: string;
+  name: string;
+  category: string;
+  grade: string;
+  price: number;
+  stock: number;
+  image: string;
+  created_at: string;
+}
 
 export default function ProductsPage() {
+  const [view, setView] = useState('grid')
+  const [sortOrder, setSortOrder] = useState('newest')
+  const router = useRouter()
+  
   return (
-    <ScrollArea className="h-[calc(100vh-60px)]">
-      <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-2xl font-bold tracking-tight md:text-3xl">My Products</h2>
-          <div className="flex items-center space-x-2">
-            <Link href="/products/add">
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                <span className="hidden sm:inline">Add New Product</span>
-                <span className="sm:hidden">Add Product</span>
-              </Button>
-            </Link>
-          </div>
+    <div className="flex-1 p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">My Products</h1>
+        <Button className="bg-green-600 hover:bg-green-700" onClick={() => router.push('/products/add')}>
+          <Plus className="mr-2 h-4 w-4" />
+          Add New Product
+        </Button>
+      </div>
+      
+      <div className="flex flex-col md:flex-row gap-4 mb-6">
+        <div className="flex-1">
+          <Input 
+            type="text" 
+            placeholder="Search products..." 
+            className="w-full"
+          />
         </div>
-
-        <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-            <Input placeholder="Search products..." className="w-full sm:w-[300px]" />
-            <Select defaultValue="all">
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="rice">Rice</SelectItem>
-                <SelectItem value="wheat">Wheat</SelectItem>
-                <SelectItem value="corn">Corn</SelectItem>
-                <SelectItem value="spices">Spices</SelectItem>
-              </SelectContent>
-            </Select>
+        
+        <div className="flex items-center gap-2">
+          <select 
+            className="border rounded-md p-2 bg-white" 
+            defaultValue="all"
+          >
+            <option value="all">All Categories</option>
+            <option value="rice">Rice</option>
+            <option value="wheat">Wheat</option>
+            <option value="corn">Corn</option>
+            <option value="spices">Spices</option>
+          </select>
+          
+          <div className="flex border rounded-md overflow-hidden">
+            <button 
+              className={`px-3 py-2 ${view === 'grid' ? 'bg-gray-200' : 'bg-white'}`}
+              onClick={() => setView('grid')}
+            >
+              Grid
+            </button>
+            <button 
+              className={`px-3 py-2 ${view === 'list' ? 'bg-gray-200' : 'bg-white'}`}
+              onClick={() => setView('list')}
+            >
+              List
+            </button>
           </div>
-          <Suspense fallback={<div>Loading...</div>}>
-            <ProductsList />
-          </Suspense>
+          
+          <select 
+            className="border rounded-md p-2 bg-white"
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+          >
+            <option value="newest">Newest First</option>
+            <option value="oldest">Oldest First</option>
+            <option value="price-high">Price: High to Low</option>
+            <option value="price-low">Price: Low to High</option>
+          </select>
         </div>
       </div>
-    </ScrollArea>
+      
+      <ProductsList view={view} />
+    </div>
   )
 }
 
-async function ProductsList() {
-  const products = await getProducts();
+interface ProductsListProps {
+  view: string;
+}
+
+function ProductsList({ view }: ProductsListProps) {
+  const [products, setProducts] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
+  const router = useRouter()
   
-  // If no products yet, show a message
+  // This will load the products on the client side
+  useEffect(() => {
+    async function loadProducts() {
+      try {
+        const productsData = await getProducts()
+        setProducts(productsData)
+      } catch (error) {
+        console.error('Error loading products:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    loadProducts()
+  }, [])
+  
+  if (loading) {
+    return <div className="text-center py-8">Loading products...</div>
+  }
+  
   if (products.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center p-8">
-        <p className="text-muted-foreground mb-4">No products found. Add your first product to get started.</p>
-        <Link href="/products/add">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Add New Product
-          </Button>
-        </Link>
+      <div className="text-center py-8">
+        <p className="text-gray-500 mb-4">No products found. Add your first product to get started.</p>
+        <Button className="bg-green-600 hover:bg-green-700" onClick={() => router.push('/products/add')}>
+          <Plus className="mr-2 h-4 w-4" />
+          Add New Product
+        </Button>
+      </div>
+    )
+  }
+  
+  if (view === 'grid') {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {products.map(product => (
+          <div key={product.id} className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="p-2 h-48 bg-gray-100 flex items-center justify-center">
+              <Image 
+                src={product.image || "/placeholder.svg"} 
+                alt={product.name}
+                width={200}
+                height={150}
+                className="object-cover max-h-full"
+              />
+            </div>
+            <div className="p-4">
+              <div className="flex justify-between items-start mb-2">
+                <h3 className="font-semibold text-lg">{product.name}</h3>
+                <button className="text-gray-500 hover:text-gray-700">
+                  <MoreVertical className="h-5 w-5" />
+                </button>
+              </div>
+              <p className="text-sm text-gray-600 mb-3">
+                {product.category} • {product.grade}
+              </p>
+              
+              <div className="flex justify-between text-sm mb-1">
+                <span>Price:</span>
+                <span className="font-medium">PKR {product.price}/kg</span>
+              </div>
+              <div className="flex justify-between text-sm mb-4">
+                <span>Available:</span>
+                <span className="font-medium">{product.stock} kg</span>
+              </div>
+              
+              <div className="flex justify-between">
+                <button className="bg-white border border-gray-300 text-gray-700 px-3 py-1 rounded-md text-sm flex items-center">
+                  <Edit className="h-4 w-4 mr-1" />
+                  Edit
+                </button>
+                <button className="bg-green-600 text-white px-3 py-1 rounded-md text-sm flex items-center">
+                  <Gavel className="h-4 w-4 mr-1" />
+                  Auction
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     )
   }
   
   return (
-    <Tabs defaultValue="grid" className="space-y-4">
-      <div className="flex items-center justify-between">
-        <TabsList>
-          <TabsTrigger value="grid">Grid</TabsTrigger>
-          <TabsTrigger value="list">List</TabsTrigger>
-        </TabsList>
-        <Select defaultValue="newest">
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Sort by" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="newest">Newest First</SelectItem>
-            <SelectItem value="oldest">Oldest First</SelectItem>
-            <SelectItem value="price-high">Price: High to Low</SelectItem>
-            <SelectItem value="price-low">Price: Low to High</SelectItem>
-          </SelectContent>
-        </Select>
+    <div className="bg-white rounded-lg shadow">
+      <div className="grid grid-cols-5 bg-gray-100 px-4 py-2">
+        <div className="col-span-2 font-medium">Product</div>
+        <div className="text-center font-medium">Price</div>
+        <div className="text-center font-medium">Stock</div>
+        <div className="text-center font-medium">Actions</div>
       </div>
-      <TabsContent value="grid" className="space-y-4">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {products.map((product) => (
-            <Card key={product.id} className="overflow-hidden border-none shadow-md">
-              <div className="relative h-48 w-full">
-                <Image src={product.image || "/placeholder.svg"} alt={product.name} fill className="object-cover" />
-              </div>
-              <CardHeader className="p-4 bg-primary/5">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="line-clamp-1 text-base">{product.name}</CardTitle>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="h-8 w-8 p-0">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem>
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <Gavel className="mr-2 h-4 w-4" />
-                        Create Auction
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-destructive">
-                        <Trash className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-                <CardDescription>
-                  {product.category} • {product.grade}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-4 pt-4">
-                <div className="flex justify-between text-sm">
-                  <span>Price:</span>
-                  <span className="font-medium">PKR {product.price}/kg</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Available:</span>
-                  <span className="font-medium">{product.stock} kg</span>
-                </div>
-              </CardContent>
-              <CardFooter className="p-4 flex justify-between">
-                <Button variant="outline" size="sm">
-                  <Edit className="mr-2 h-4 w-4" />
-                  Edit
-                </Button>
-                <Button size="sm">
-                  <Gavel className="mr-2 h-4 w-4" />
-                  Auction
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
-      </TabsContent>
-      <TabsContent value="list" className="space-y-4">
-        <Card className="border-none shadow-md">
-          <CardContent className="p-0">
-            <div className="rounded-md">
-              <div className="grid grid-cols-5 bg-primary/5 px-4 py-3 font-medium">
-                <div className="col-span-2">Product</div>
-                <div className="text-center">Price</div>
-                <div className="text-center">Stock</div>
-                <div className="text-center">Actions</div>
-              </div>
-              <ScrollArea className="h-[500px]">
-                {products.map((product) => (
-                  <div key={product.id} className="grid grid-cols-5 items-center px-4 py-3 border-b">
-                    <div className="col-span-2 flex items-center gap-4">
-                      <div className="relative h-10 w-10 overflow-hidden rounded-md">
-                        <Image
-                          src={product.image || "/placeholder.svg"}
-                          alt={product.name}
-                          fill
-                          className="object-cover"
-                        />
-                      </div>
-                      <div>
-                        <div className="font-medium">{product.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {product.category} • {product.grade}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-center">PKR {product.price}/kg</div>
-                    <div className="text-center">{product.stock} kg</div>
-                    <div className="flex justify-center space-x-2">
-                      <Button variant="outline" size="icon" className="h-8 w-8">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="icon" className="h-8 w-8">
-                        <Gavel className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="icon" className="h-8 w-8 text-destructive">
-                        <Trash className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </ScrollArea>
+      
+      {products.map(product => (
+        <div key={product.id} className="grid grid-cols-5 items-center px-4 py-3 border-b">
+          <div className="col-span-2 flex items-center">
+            <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center mr-3">
+              <Image 
+                src={product.image || "/placeholder.svg"} 
+                alt={product.name}
+                width={40}
+                height={40}
+                className="object-cover"
+              />
             </div>
-          </CardContent>
-        </Card>
-      </TabsContent>
-    </Tabs>
+            <div>
+              <div className="font-medium">{product.name}</div>
+              <div className="text-xs text-gray-500">{product.category} • {product.grade}</div>
+            </div>
+          </div>
+          <div className="text-center">PKR {product.price}/kg</div>
+          <div className="text-center">{product.stock} kg</div>
+          <div className="flex justify-center space-x-2">
+            <button className="bg-white border border-gray-300 p-1 rounded">
+              <Edit className="h-4 w-4" />
+            </button>
+            <button className="bg-white border border-gray-300 p-1 rounded">
+              <Gavel className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
   )
 }
 

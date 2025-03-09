@@ -1,9 +1,11 @@
 "use client"
 
-import { BarChart3, Box, Gavel, Home, Package, ShoppingCart, Store, Sun, Moon, User } from "lucide-react"
+import { BarChart3, Box, Gavel, Home, LogOut, Package, ShoppingCart, Store, Sun, Moon, User } from "lucide-react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
+import { useState, useEffect } from "react"
+import { supabase } from "@/lib/supabase"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -29,7 +31,48 @@ import {
 
 export function AppSidebar() {
   const pathname = usePathname()
+  const router = useRouter()
   const { setTheme } = useTheme()
+  const [user, setUser] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSigningOut, setIsSigningOut] = useState(false)
+
+  useEffect(() => {
+    const checkUser = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession()
+        if (error) throw error
+        setUser(session?.user || null)
+      } catch (error) {
+        console.error('Error checking auth status:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    checkUser()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user || null)
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [])
+
+  const handleSignOut = async () => {
+    try {
+      setIsSigningOut(true)
+      await supabase.auth.signOut()
+      router.push('/signin')
+      router.refresh()
+    } catch (error) {
+      console.error('Error signing out:', error)
+    } finally {
+      setIsSigningOut(false)
+    }
+  }
 
   const routes = [
     {
@@ -69,6 +112,41 @@ export function AppSidebar() {
     },
   ]
 
+  // If user is not logged in and not on auth pages, show auth options
+  if (!user && !isLoading && !pathname.includes('/signin') && !pathname.includes('/signup')) {
+    return (
+      <Sidebar>
+        <SidebarHeader className="flex items-center px-4 py-2">
+          <Link href="/" className="flex items-center gap-2">
+            <Store className="h-6 w-6 text-primary" />
+            <span className="text-xl font-bold">Mandi</span>
+          </Link>
+        </SidebarHeader>
+        <SidebarSeparator />
+        <SidebarContent className="flex flex-col justify-between h-full">
+          <div>
+            <p className="px-4 py-2 text-sm text-gray-500">Please sign in to access the marketplace</p>
+          </div>
+          <div className="px-4 py-2 space-y-2 mt-auto">
+            <Link 
+              href="/signin"
+              className="flex w-full items-center justify-center rounded-md bg-white border border-green-500 px-3 py-2 text-sm font-medium text-green-600 hover:bg-green-50 transition-colors"
+            >
+              Sign in
+            </Link>
+            <Link 
+              href="/signup"
+              className="flex w-full items-center justify-center rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 transition-colors"
+            >
+              Sign up
+            </Link>
+          </div>
+        </SidebarContent>
+        <SidebarRail />
+      </Sidebar>
+    )
+  }
+
   return (
     <Sidebar>
       <SidebarHeader className="flex items-center px-4 py-2">
@@ -99,15 +177,22 @@ export function AppSidebar() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="h-8 w-8 rounded-full">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src="/placeholder-user.jpg" alt="User" />
-                  <AvatarFallback>
-                    <User className="h-4 w-4" />
-                  </AvatarFallback>
+                  {user?.email ? (
+                    <AvatarFallback className="bg-green-600 text-white">
+                      {user.email.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  ) : (
+                    <AvatarFallback>
+                      <User className="h-4 w-4" />
+                    </AvatarFallback>
+                  )}
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>My Account</DropdownMenuLabel>
+              <DropdownMenuLabel>
+                {user?.email ? user.email : 'My Account'}
+              </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem>
                 <User className="mr-2 h-4 w-4" />
@@ -122,8 +207,13 @@ export function AppSidebar() {
                 <span>Dark</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <span>Log out</span>
+              <DropdownMenuItem 
+                onClick={handleSignOut}
+                disabled={isSigningOut}
+                className="text-red-500 focus:text-red-500"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>{isSigningOut ? 'Signing out...' : 'Sign out'}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
