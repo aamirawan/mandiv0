@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
-import { z } from "zod"
+import * as z from "zod"
 import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
@@ -12,6 +12,11 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { ArrowLeft, Upload } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/components/ui/use-toast"
+import { ToastAction } from "@/components/ui/toast"
+import { createProduct } from "@/lib/supabase-service"
+import { useRouter } from "next/navigation"
+import { useSupabase } from "@/lib/supabase-provider"
+import { useState } from "react"
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -36,6 +41,9 @@ const formSchema = z.object({
 
 export default function AddProductPage() {
   const { toast } = useToast()
+  const router = useRouter()
+  const { supabase } = useSupabase()
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -46,13 +54,56 @@ export default function AddProductPage() {
     },
   })
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    console.log(values)
-    toast({
-      title: "Product added successfully",
-      description: `${values.name} has been added to your products.`,
-    })
-    form.reset()
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    try {
+      setIsSubmitting(true)
+      
+      // Add created_at timestamp
+      const productData = {
+        ...values,
+        created_at: new Date().toISOString(),
+      }
+      
+      // Create product in Supabase
+      const newProduct = await createProduct(productData)
+      
+      if (newProduct) {
+        toast({
+          title: "Product Added",
+          description: "Your product has been added successfully.",
+          action: (
+            <ToastAction altText="View Products" onClick={() => router.push('/products')}>
+              View Products
+            </ToastAction>
+          ),
+        })
+        
+        form.reset()
+        // Redirect to products page
+        router.push('/products')
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to add product. Please try again.",
+          variant: "destructive",
+          action: (
+            <ToastAction altText="Try Again">Try Again</ToastAction>
+          ),
+        })
+      }
+    } catch (error) {
+      console.error("Error adding product:", error)
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+        action: (
+          <ToastAction altText="Try Again">Try Again</ToastAction>
+        ),
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -148,7 +199,7 @@ export default function AddProductPage() {
                       name="price"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Price (₹) *</FormLabel>
+                          <FormLabel>Price (PKR) *</FormLabel>
                           <FormControl>
                             <Input type="number" placeholder="0.00" {...field} />
                           </FormControl>
@@ -260,7 +311,7 @@ export default function AddProductPage() {
                   <Button variant="outline" type="button" asChild>
                     <Link href="/products">Cancel</Link>
                   </Button>
-                  <Button type="submit">Add Product</Button>
+                  <Button type="submit" disabled={isSubmitting}>Add Product</Button>
                 </CardFooter>
               </form>
             </Form>

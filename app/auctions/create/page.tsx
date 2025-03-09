@@ -2,22 +2,23 @@
 
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
-import { z } from "zod"
+import * as z from "zod"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Textarea } from "@/components/ui/textarea"
+import { useToast } from "@/components/ui/use-toast"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Checkbox } from "@/components/ui/checkbox"
+import { ToastAction } from "@/components/ui/toast"
 import { ArrowLeft, Calendar } from "lucide-react"
 import Link from "next/link"
-import { useToast } from "@/components/ui/use-toast"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Checkbox } from "@/components/ui/checkbox"
 
 const formSchema = z.object({
   productId: z.string({
@@ -68,8 +69,11 @@ export default function CreateAuctionPage() {
   function onSubmit(values: z.infer<typeof formSchema>) {
     console.log(values)
     toast({
-      title: "Auction created successfully",
-      description: "Your auction has been created and is now live.",
+      title: "Auction Created",
+      description: "Your auction has been created successfully.",
+      action: (
+        <ToastAction altText="View Auctions">View Auctions</ToastAction>
+      ),
     })
     form.reset()
   }
@@ -144,7 +148,7 @@ export default function CreateAuctionPage() {
                     name="startingBid"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Starting Bid (₹/kg) *</FormLabel>
+                        <FormLabel>Starting Bid (PKR/kg) *</FormLabel>
                         <FormControl>
                           <Input type="number" placeholder="0.00" {...field} />
                         </FormControl>
@@ -159,7 +163,7 @@ export default function CreateAuctionPage() {
                     name="reservePrice"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Reserve Price (₹/kg)</FormLabel>
+                        <FormLabel>Reserve Price (PKR/kg)</FormLabel>
                         <FormControl>
                           <Input type="number" placeholder="0.00" {...field} />
                         </FormControl>
@@ -174,7 +178,7 @@ export default function CreateAuctionPage() {
                     name="incrementAmount"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Bid Increment (₹) *</FormLabel>
+                        <FormLabel>Bid Increment (PKR) *</FormLabel>
                         <FormControl>
                           <Input type="number" placeholder="1.00" {...field} />
                         </FormControl>

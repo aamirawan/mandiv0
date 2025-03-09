@@ -66,7 +66,7 @@ export default function InventoryPage() {
               </svg>
             </CardHeader>
             <CardContent className="p-6">
-              <div className="text-2xl font-bold">₹84,432.50</div>
+              <div className="text-2xl font-bold">PKR 84,432.50</div>
               <p className="text-xs text-muted-foreground mt-1">Based on current market prices</p>
             </CardContent>
           </Card>
@@ -140,7 +140,7 @@ export default function InventoryPage() {
                     <TableHead>Category</TableHead>
                     <TableHead className="text-right">
                       <div className="flex items-center justify-end">
-                        Price (₹/kg)
+                        Price (PKR/kg)
                         <ArrowUpDown className="ml-2 h-4 w-4" />
                       </div>
                     </TableHead>
@@ -160,7 +160,7 @@ export default function InventoryPage() {
                       <TableCell className="font-medium">{item.sku}</TableCell>
                       <TableCell>{item.name}</TableCell>
                       <TableCell>{item.category}</TableCell>
-                      <TableCell className="text-right">₹{item.price}</TableCell>
+                      <TableCell className="text-right">PKR {item.price}</TableCell>
                       <TableCell className="text-right">{item.stock} kg</TableCell>
                       <TableCell>
                         <Badge variant={item.stock === 0 ? "destructive" : item.stock < 50 ? "outline" : "secondary"}>

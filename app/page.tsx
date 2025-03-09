@@ -10,8 +10,8 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 
 export default function Dashboard() {
   return (
-    <ScrollArea className="h-[calc(100vh-60px)]">
-      <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+    <ScrollArea className="h-[calc(100vh-60px)] w-full">
+      <div className="flex-1 space-y-4 p-4 md:p-8 pt-6 w-full">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-2xl font-bold tracking-tight md:text-3xl">Dashboard</h2>
           <div className="flex items-center space-x-2">
@@ -46,7 +46,7 @@ export default function Dashboard() {
                   <CircleDollarSign className="h-4 w-4 text-primary" />
                 </CardHeader>
                 <CardContent className="p-6">
-                  <div className="text-2xl font-bold">₹45,231.89</div>
+                  <div className="text-2xl font-bold">PKR 45,231.89</div>
                   <p className="text-xs text-muted-foreground mt-1">
                     <span className="text-green-500 flex items-center">
                       +20.1% <TrendingUp className="ml-1 h-3 w-3" />

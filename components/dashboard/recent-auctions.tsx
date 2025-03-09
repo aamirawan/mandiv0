@@ -62,7 +62,7 @@ export function RecentAuctions() {
           <TableRow>
             <TableHead>Product</TableHead>
             <TableHead className="hidden sm:table-cell">Quantity</TableHead>
-            <TableHead className="text-right">Current Bid (₹/kg)</TableHead>
+            <TableHead className="text-right">Current Bid (PKR/kg)</TableHead>
             <TableHead className="text-right">Ends In</TableHead>
             <TableHead className="text-right">Action</TableHead>
           </TableRow>
@@ -72,7 +72,7 @@ export function RecentAuctions() {
             <TableRow key={auction.id}>
               <TableCell className="font-medium">{auction.product}</TableCell>
               <TableCell className="hidden sm:table-cell">{auction.quantity}</TableCell>
-              <TableCell className="text-right">₹{auction.currentBid}</TableCell>
+              <TableCell className="text-right">PKR {auction.currentBid}</TableCell>
               <TableCell className="text-right">
                 <Badge variant={auction.endTime.includes("d") ? "outline" : "secondary"} className="gap-1">
                   <Clock className="h-3 w-3" />

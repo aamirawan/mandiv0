@@ -9,31 +9,31 @@ const marketPrices = [
     product: "Basmati Rice",
     price: 85,
     change: 2.5,
-    location: "Delhi Mandi",
+    location: "Lahore Mandi",
   },
   {
     product: "Wheat",
     price: 32,
     change: -1.2,
-    location: "Ludhiana Mandi",
+    location: "Karachi Mandi",
   },
   {
     product: "Yellow Corn",
     price: 28,
     change: 0.8,
-    location: "Karnal Mandi",
+    location: "Faisalabad Mandi",
   },
   {
     product: "Red Chilli",
     price: 120,
     change: 5.3,
-    location: "Guntur Mandi",
+    location: "Multan Mandi",
   },
   {
     product: "Turmeric",
     price: 95,
     change: -2.1,
-    location: "Sangli Mandi",
+    location: "Islamabad Mandi",
   },
 ]
 
@@ -44,7 +44,7 @@ export function MarketPrices() {
         <TableHeader>
           <TableRow>
             <TableHead>Product</TableHead>
-            <TableHead className="text-right">Price (₹/kg)</TableHead>
+            <TableHead className="text-right">Price (PKR/kg)</TableHead>
             <TableHead className="text-right">Change</TableHead>
             <TableHead className="hidden md:table-cell">Location</TableHead>
           </TableRow>
@@ -53,7 +53,7 @@ export function MarketPrices() {
           {marketPrices.map((item) => (
             <TableRow key={item.product}>
               <TableCell className="font-medium">{item.product}</TableCell>
-              <TableCell className="text-right">₹{item.price}</TableCell>
+              <TableCell className="text-right">PKR {item.price}</TableCell>
               <TableCell className="text-right">
                 <span
                   className={`flex items-center justify-end ${item.change > 0 ? "text-green-500" : "text-red-500"}`}

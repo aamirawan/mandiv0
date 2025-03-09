@@ -107,7 +107,7 @@ export default function AuctionsPage() {
                   <CardContent className="p-4 pt-4">
                     <div className="flex justify-between text-sm">
                       <span>Current Bid:</span>
-                      <span className="font-medium">₹{auction.currentBid}/kg</span>
+                      <span className="font-medium">PKR {auction.currentBid}/kg</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span>Quantity:</span>

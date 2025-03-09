@@ -64,10 +64,10 @@ export function RevenueChart() {
           fontSize={12}
           tickLine={false}
           axisLine={false}
-          tickFormatter={(value) => `₹${value}`}
+          tickFormatter={(value) => `PKR ${value}`}
         />
         <Tooltip
-          formatter={(value: number) => [`₹${value}`, "Revenue"]}
+          formatter={(value: number) => [`PKR ${value}`, "Revenue"]}
           contentStyle={{
             backgroundColor: "hsl(var(--card))",
             borderColor: "hsl(var(--border))",
