@@ -10,11 +10,14 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { InfoIcon } from 'lucide-react'
 
 export default function AddProductPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [bucketMissing, setBucketMissing] = useState(false)
   const [productData, setProductData] = useState({
     name: '',
     category: '',
@@ -28,6 +31,7 @@ export default function AddProductPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       setSelectedFile(e.target.files[0])
+      setBucketMissing(false) // Reset bucket missing state when file changes
     }
   }
 
@@ -86,32 +90,47 @@ export default function AddProductPage() {
           const bucketExists = buckets.some(bucket => bucket.name === 'product-images')
           if (!bucketExists) {
             console.error('Bucket product-images does not exist')
-            throw new Error('Storage bucket not found. Please create a bucket named "product-images" in your Supabase project.')
-          }
-          
-          // Create a unique file name
-          const fileExt = selectedFile.name.split('.').pop()
-          const fileName = `${Date.now()}.${fileExt}`
-          
-          // Upload to Supabase Storage
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('product-images')
-            .upload(fileName, selectedFile)
-          
-          if (uploadError) {
-            console.error('File upload error:', uploadError)
-            throw new Error('Failed to upload image: ' + uploadError.message)
-          }
-          
-          console.log('File uploaded successfully:', uploadData)
-          
-          // Get public URL for the uploaded file
-          const { data: urlData } = supabase.storage
-            .from('product-images')
-            .getPublicUrl(fileName)
+            setBucketMissing(true)
+            // Use a placeholder image instead of failing
+            const categoryMap: Record<string, string> = {
+              'Rice': '/placeholders/rice.jpg',
+              'Wheat': '/placeholders/wheat.jpg',
+              'Corn': '/placeholders/corn.jpg',
+              'Spices': '/placeholders/spices.jpg'
+            }
+            product.image = categoryMap[product.category] || '/placeholders/rice.jpg'
             
-          // Add image to the product data
-          product.image = urlData.publicUrl
+            // Show a warning toast but continue with product creation
+            toast({
+              title: 'Storage Not Configured',
+              description: 'The product-images bucket does not exist. Using placeholder image instead.',
+              variant: 'destructive',
+            })
+          } else {
+            // Create a unique file name
+            const fileExt = selectedFile.name.split('.').pop()
+            const fileName = `${Date.now()}.${fileExt}`
+            
+            // Upload to Supabase Storage
+            const { data: uploadData, error: uploadError } = await supabase.storage
+              .from('product-images')
+              .upload(fileName, selectedFile)
+            
+            if (uploadError) {
+              console.error('File upload error:', uploadError)
+              throw new Error('Failed to upload image: ' + uploadError.message)
+            }
+            
+            console.log('File uploaded successfully:', uploadData)
+            
+            // Get public URL for the uploaded file
+            const { data: urlData } = supabase.storage
+              .from('product-images')
+              .getPublicUrl(fileName)
+              
+            // Add image to the product data
+            product.image = urlData.publicUrl
+          }
         } catch (uploadErr: any) {
           console.error('Upload process error:', uploadErr)
           toast({
@@ -120,7 +139,13 @@ export default function AddProductPage() {
             variant: 'destructive',
           })
           // Continue without image rather than failing the whole product creation
-          product.image = ''
+          const categoryMap: Record<string, string> = {
+            'Rice': '/placeholders/rice.jpg',
+            'Wheat': '/placeholders/wheat.jpg',
+            'Corn': '/placeholders/corn.jpg',
+            'Spices': '/placeholders/spices.jpg'
+          }
+          product.image = categoryMap[product.category] || '/placeholders/rice.jpg'
         }
       } else {
         // If no image uploaded, use a placeholder based on category
@@ -168,6 +193,23 @@ export default function AddProductPage() {
         <h1 className="text-2xl font-bold">Add New Product</h1>
         <p className="text-gray-500">Create a new product listing</p>
       </div>
+      
+      {bucketMissing && (
+        <Alert variant="destructive" className="mb-6">
+          <InfoIcon className="h-4 w-4" />
+          <AlertTitle>Supabase Storage Not Configured</AlertTitle>
+          <AlertDescription>
+            The 'product-images' storage bucket doesn't exist in your Supabase project. 
+            <ol className="list-decimal ml-5 mt-2">
+              <li>Go to your Supabase dashboard</li>
+              <li>Navigate to Storage section</li>
+              <li>Create a new bucket named "product-images"</li>
+              <li>Set appropriate permissions</li>
+            </ol>
+            <p className="mt-2">Your product will be created with a placeholder image.</p>
+          </AlertDescription>
+        </Alert>
+      )}
       
       <form onSubmit={handleSubmit} className="max-w-2xl space-y-6">
         <div className="grid gap-4 sm:grid-cols-2">
