@@ -1,323 +1,263 @@
 "use client"
 
-import { zodResolver } from "@hookform/resolvers/zod"
-import { useForm } from "react-hook-form"
-import * as z from "zod"
-import { Button } from "@/components/ui/button"
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Upload } from "lucide-react"
-import Link from "next/link"
-import { useToast } from "@/components/ui/use-toast"
-import { ToastAction } from "@/components/ui/toast"
-import { createProduct } from "@/lib/supabase-service"
-import { useRouter } from "next/navigation"
-import { useSupabase } from "@/lib/supabase-provider"
-import { useState } from "react"
-
-const formSchema = z.object({
-  name: z.string().min(2, {
-    message: "Product name must be at least 2 characters.",
-  }),
-  category: z.string({
-    required_error: "Please select a category.",
-  }),
-  grade: z.string({
-    required_error: "Please select a grade.",
-  }),
-  price: z.coerce.number().positive({
-    message: "Price must be a positive number.",
-  }),
-  stock: z.coerce.number().int().positive({
-    message: "Stock must be a positive integer.",
-  }),
-  unit: z.string().default("kg"),
-  description: z.string().optional(),
-  images: z.any().optional(),
-})
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { createProduct } from '@/lib/supabase-service'
+import { supabase } from '@/lib/supabase'
+import { toast } from '@/hooks/use-toast'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 export default function AddProductPage() {
-  const { toast } = useToast()
   const router = useRouter()
-  const { supabase } = useSupabase()
-  const [isSubmitting, setIsSubmitting] = useState(false)
-
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      name: "",
-      unit: "kg",
-      description: "",
-    },
+  const [isLoading, setIsLoading] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [productData, setProductData] = useState({
+    name: '',
+    category: '',
+    grade: '',
+    price: '',
+    stock: '',
+    unit: 'kg',
+    description: ''
   })
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setSelectedFile(e.target.files[0])
+    }
+  }
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target
+    setProductData(prev => ({ ...prev, [name]: value }))
+  }
+
+  const handleSelectChange = (name: string, value: string) => {
+    setProductData(prev => ({ ...prev, [name]: value }))
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+
     try {
-      setIsSubmitting(true)
-      
-      // Add created_at timestamp
-      const productData = {
-        ...values,
-        created_at: new Date().toISOString(),
+      // Validate required fields
+      const requiredFields = ['name', 'category', 'grade', 'price', 'stock']
+      for (const field of requiredFields) {
+        if (!productData[field as keyof typeof productData]) {
+          throw new Error(`${field.charAt(0).toUpperCase() + field.slice(1)} is required`)
+        }
+      }
+
+      // Validate numeric fields
+      if (isNaN(Number(productData.price)) || Number(productData.price) <= 0) {
+        throw new Error('Price must be a positive number')
       }
       
-      // Create product in Supabase
-      const newProduct = await createProduct(productData)
-      
-      if (newProduct) {
-        toast({
-          title: "Product Added",
-          description: "Your product has been added successfully.",
-          action: (
-            <ToastAction altText="View Products" onClick={() => router.push('/products')}>
-              View Products
-            </ToastAction>
-          ),
-        })
+      if (isNaN(Number(productData.stock)) || Number(productData.stock) <= 0) {
+        throw new Error('Stock must be a positive number')
+      }
+
+      // Format data for database
+      const product = {
+        ...productData,
+        price: parseFloat(productData.price),
+        stock: parseInt(productData.stock),
+        images: [] as string[]
+      }
+
+      // Handle file upload if a file is selected
+      if (selectedFile) {
+        // Create a unique file name
+        const fileExt = selectedFile.name.split('.').pop()
+        const fileName = `${Date.now()}.${fileExt}`
         
-        form.reset()
-        // Redirect to products page
-        router.push('/products')
-      } else {
-        toast({
-          title: "Error",
-          description: "Failed to add product. Please try again.",
-          variant: "destructive",
-          action: (
-            <ToastAction altText="Try Again">Try Again</ToastAction>
-          ),
-        })
+        // Upload to Supabase Storage
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('product-images')
+          .upload(fileName, selectedFile)
+        
+        if (uploadError) {
+          throw uploadError
+        }
+        
+        // Add image to the product data
+        product.images = [fileName]
       }
-    } catch (error) {
-      console.error("Error adding product:", error)
+      
+      // Create product in the database
+      const newProduct = await createProduct(product)
+      
+      if (!newProduct) {
+        throw new Error('Failed to create product')
+      }
+      
       toast({
-        title: "Error",
-        description: "An unexpected error occurred. Please try again.",
-        variant: "destructive",
-        action: (
-          <ToastAction altText="Try Again">Try Again</ToastAction>
-        ),
+        title: 'Product Created',
+        description: `${product.name} has been added successfully.`,
+      })
+      
+      // Redirect to products page
+      router.push('/products')
+    } catch (error: any) {
+      console.error('Error creating product:', error)
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to create product',
+        variant: 'destructive',
       })
     } finally {
-      setIsSubmitting(false)
+      setIsLoading(false)
     }
   }
 
   return (
-    <div className="flex flex-col">
-      <div className="flex-1 space-y-4 p-8 pt-6">
-        <div className="flex items-center space-x-2">
-          <Link href="/products">
-            <Button variant="outline" size="icon">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <h2 className="text-3xl font-bold tracking-tight">Add New Product</h2>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Product Information</CardTitle>
-            <CardDescription>Enter the details of your product. All fields marked with * are required.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-                <div className="grid gap-6 md:grid-cols-2">
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Product Name *</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Premium Basmati Rice" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="category"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Category *</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a category" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="rice">Rice</SelectItem>
-                            <SelectItem value="wheat">Wheat</SelectItem>
-                            <SelectItem value="corn">Corn</SelectItem>
-                            <SelectItem value="pulses">Pulses</SelectItem>
-                            <SelectItem value="spices">Spices</SelectItem>
-                            <SelectItem value="fruits">Fruits</SelectItem>
-                            <SelectItem value="vegetables">Vegetables</SelectItem>
-                            <SelectItem value="other">Other</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="grade"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Grade *</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a grade" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="premium">Premium</SelectItem>
-                            <SelectItem value="standard">Standard</SelectItem>
-                            <SelectItem value="economy">Economy</SelectItem>
-                            <SelectItem value="organic">Organic</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="price"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Price (PKR) *</FormLabel>
-                          <FormControl>
-                            <Input type="number" placeholder="0.00" {...field} />
-                          </FormControl>
-                          <FormDescription>Price per kg/unit</FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="stock"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Stock *</FormLabel>
-                          <FormControl>
-                            <Input type="number" placeholder="0" {...field} />
-                          </FormControl>
-                          <FormDescription>Available quantity</FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <FormField
-                    control={form.control}
-                    name="unit"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Unit *</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a unit" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="kg">Kilogram (kg)</SelectItem>
-                            <SelectItem value="g">Gram (g)</SelectItem>
-                            <SelectItem value="ton">Ton</SelectItem>
-                            <SelectItem value="quintal">Quintal</SelectItem>
-                            <SelectItem value="piece">Piece</SelectItem>
-                            <SelectItem value="dozen">Dozen</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Description</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Enter product description, quality details, and other relevant information..."
-                          className="min-h-[120px]"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="images"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Product Images</FormLabel>
-                      <FormControl>
-                        <div className="flex items-center justify-center w-full">
-                          <label
-                            htmlFor="dropzone-file"
-                            className="flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted"
-                          >
-                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                              <Upload className="w-8 h-8 mb-4 text-muted-foreground" />
-                              <p className="mb-2 text-sm text-muted-foreground">
-                                <span className="font-semibold">Click to upload</span> or drag and drop
-                              </p>
-                              <p className="text-xs text-muted-foreground">PNG, JPG or WEBP (MAX. 5MB)</p>
-                            </div>
-                            <input
-                              id="dropzone-file"
-                              type="file"
-                              className="hidden"
-                              multiple
-                              onChange={(e) => field.onChange(e.target.files)}
-                            />
-                          </label>
-                        </div>
-                      </FormControl>
-                      <FormDescription>
-                        Upload up to 5 images of your product. First image will be used as the main image.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <CardFooter className="flex justify-between px-0">
-                  <Button variant="outline" type="button" asChild>
-                    <Link href="/products">Cancel</Link>
-                  </Button>
-                  <Button type="submit" disabled={isSubmitting}>Add Product</Button>
-                </CardFooter>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
+    <div className="p-6">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold">Add New Product</h1>
+        <p className="text-gray-500">Create a new product listing</p>
       </div>
+      
+      <form onSubmit={handleSubmit} className="max-w-2xl space-y-6">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="name">Product Name</Label>
+            <Input
+              id="name"
+              name="name"
+              placeholder="e.g. Premium Basmati Rice"
+              value={productData.name}
+              onChange={handleChange}
+              required
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="category">Category</Label>
+            <Select 
+              value={productData.category} 
+              onValueChange={(value) => handleSelectChange('category', value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Rice">Rice</SelectItem>
+                <SelectItem value="Wheat">Wheat</SelectItem>
+                <SelectItem value="Corn">Corn</SelectItem>
+                <SelectItem value="Spices">Spices</SelectItem>
+                <SelectItem value="Other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="grade">Grade</Label>
+            <Select 
+              value={productData.grade} 
+              onValueChange={(value) => handleSelectChange('grade', value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select grade" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Premium">Premium</SelectItem>
+                <SelectItem value="Grade A">Grade A</SelectItem>
+                <SelectItem value="Grade B">Grade B</SelectItem>
+                <SelectItem value="Organic">Organic</SelectItem>
+                <SelectItem value="Standard">Standard</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="unit">Unit</Label>
+            <Select 
+              value={productData.unit} 
+              onValueChange={(value) => handleSelectChange('unit', value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select unit" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="kg">kg</SelectItem>
+                <SelectItem value="g">g</SelectItem>
+                <SelectItem value="ton">ton</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="price">Price (PKR/kg)</Label>
+            <Input
+              id="price"
+              name="price"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="e.g. 85.00"
+              value={productData.price}
+              onChange={handleChange}
+              required
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="stock">Available Stock</Label>
+            <Input
+              id="stock"
+              name="stock"
+              type="number"
+              min="0"
+              placeholder="e.g. 500"
+              value={productData.stock}
+              onChange={handleChange}
+              required
+            />
+          </div>
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="description">Description</Label>
+          <Textarea
+            id="description"
+            name="description"
+            placeholder="Enter product description..."
+            rows={4}
+            value={productData.description}
+            onChange={handleChange}
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="image">Product Image</Label>
+          <Input
+            id="image"
+            name="image"
+            type="file"
+            accept="image/*"
+            onChange={handleFileChange}
+          />
+          <p className="text-xs text-gray-500">Upload a product image (optional)</p>
+        </div>
+        
+        <div className="flex gap-4">
+          <Button type="submit" disabled={isLoading}>
+            {isLoading ? 'Creating...' : 'Create Product'}
+          </Button>
+          <Button type="button" variant="outline" onClick={() => router.push('/products')}>
+            Cancel
+          </Button>
+        </div>
+      </form>
     </div>
   )
 }

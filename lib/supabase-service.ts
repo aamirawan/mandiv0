@@ -35,13 +35,18 @@ export async function getProducts() {
       .order('created_at', { ascending: false })
     
     if (error) {
-      // If the error is due to table not existing, return mock data
+      // Only return mock data if table doesn't exist - otherwise, log the error
       if (error.code === '42P01') { // PostgreSQL code for undefined_table
-        console.log('Products table does not exist, returning mock data')
+        console.warn('Products table does not exist, returning mock data')
         return getMockProducts()
       }
       console.error('Error fetching products:', error)
       throw error
+    }
+    
+    // If we got an empty array but no error, the table exists but is empty
+    if (data.length === 0) {
+      console.warn('No products found in database')
     }
     
     return data || []
@@ -109,9 +114,15 @@ export async function getProductById(id: string) {
     if (error) {
       // If the error is due to table not existing, return mock data
       if (error.code === '42P01') { // PostgreSQL code for undefined_table
-        console.log('Products table does not exist, returning mock data')
+        console.warn('Products table does not exist, returning mock data')
         return getMockProducts().find(product => product.id === id) || null
       }
+      
+      // If not found, return null
+      if (error.code === 'PGRST116') { // Not found
+        return null
+      }
+      
       console.error(`Error fetching product with id ${id}:`, error)
       return null
     }
@@ -131,16 +142,6 @@ export async function createProduct(product: any) {
       .select()
     
     if (error) {
-      // If the error is due to table not existing, return mock data
-      if (error.code === '42P01') { // PostgreSQL code for undefined_table
-        console.log('Products table does not exist, returning mock created product')
-        const mockProduct = {
-          ...product,
-          id: Date.now().toString(),
-          created_at: new Date().toISOString()
-        }
-        return mockProduct
-      }
       console.error('Error creating product:', error)
       return null
     }
@@ -161,19 +162,6 @@ export async function updateProduct(id: string, updates: any) {
       .select()
     
     if (error) {
-      // If the error is due to table not existing, return mock data
-      if (error.code === '42P01') { // PostgreSQL code for undefined_table
-        console.log('Products table does not exist, returning mock updated product')
-        const mockProducts = getMockProducts()
-        const productIndex = mockProducts.findIndex(p => p.id === id)
-        if (productIndex === -1) return null
-        
-        const updatedProduct = {
-          ...mockProducts[productIndex],
-          ...updates
-        }
-        return updatedProduct
-      }
       console.error(`Error updating product with id ${id}:`, error)
       return null
     }
@@ -193,11 +181,6 @@ export async function deleteProduct(id: string) {
       .eq('id', id)
     
     if (error) {
-      // If the error is due to table not existing, return success
-      if (error.code === '42P01') { // PostgreSQL code for undefined_table
-        console.log('Products table does not exist, pretending deletion was successful')
-        return true
-      }
       console.error(`Error deleting product with id ${id}:`, error)
       return false
     }
@@ -214,13 +197,20 @@ export async function getAuctions() {
   try {
     const { data, error } = await supabase
       .from('auctions')
-      .select('*')
+      .select(`
+        *,
+        product:product_id (
+          name,
+          category,
+          grade
+        )
+      `)
       .order('created_at', { ascending: false })
     
     if (error) {
       // If the error is due to table not existing, return mock data
       if (error.code === '42P01') {
-        console.log('Auctions table does not exist, returning mock data')
+        console.warn('Auctions table does not exist, returning mock data')
         return getMockAuctions()
       }
       console.error('Error fetching auctions:', error)
@@ -234,7 +224,7 @@ export async function getAuctions() {
   }
 }
 
-// Mock auctions data
+// Only used as fallback if database tables don't exist
 function getMockAuctions() {
   return [
     {
@@ -245,7 +235,12 @@ function getMockAuctions() {
       current_bid: 85,
       quantity: 500,
       ends_in: '2h 15m',
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      product: {
+        name: 'Premium Basmati Rice',
+        category: 'Rice',
+        grade: 'Premium'
+      }
     },
     {
       id: '2',
@@ -255,7 +250,12 @@ function getMockAuctions() {
       current_bid: 34,
       quantity: 1000,
       ends_in: '5h 30m',
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      product: {
+        name: 'Organic Wheat',
+        category: 'Wheat',
+        grade: 'Organic'
+      }
     },
     {
       id: '3',
@@ -265,7 +265,12 @@ function getMockAuctions() {
       current_bid: 28,
       quantity: 750,
       ends_in: '1d 4h',
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      product: {
+        name: 'Yellow Corn',
+        category: 'Corn',
+        grade: 'Grade A'
+      }
     }
   ]
 }
@@ -278,16 +283,6 @@ export async function createAuction(auction: any) {
       .select()
     
     if (error) {
-      // If the error is due to table not existing, return mock data
-      if (error.code === '42P01') {
-        console.log('Auctions table does not exist, returning mock created auction')
-        const mockAuction = {
-          ...auction,
-          id: Date.now().toString(),
-          created_at: new Date().toISOString()
-        }
-        return mockAuction
-      }
       console.error('Error creating auction:', error)
       return null
     }
@@ -304,13 +299,20 @@ export async function getInventoryItems() {
   try {
     const { data, error } = await supabase
       .from('inventory')
-      .select('*')
+      .select(`
+        *,
+        product:product_id (
+          name,
+          category,
+          grade
+        )
+      `)
       .order('created_at', { ascending: false })
     
     if (error) {
       // If the error is due to table not existing, return mock data
       if (error.code === '42P01') {
-        console.log('Inventory table does not exist, returning mock data')
+        console.warn('Inventory table does not exist, returning mock data')
         return getMockInventory()
       }
       console.error('Error fetching inventory items:', error)
@@ -324,7 +326,7 @@ export async function getInventoryItems() {
   }
 }
 
-// Mock inventory data
+// Only used as fallback if database tables don't exist
 function getMockInventory() {
   return [
     {
@@ -333,7 +335,12 @@ function getMockInventory() {
       name: 'Premium Basmati Rice',
       stock: 75000,
       unit: 'kg',
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      product: {
+        name: 'Premium Basmati Rice',
+        category: 'Rice',
+        grade: 'Premium'
+      }
     },
     {
       id: '2',
@@ -341,7 +348,12 @@ function getMockInventory() {
       name: 'Organic Wheat',
       stock: 32500,
       unit: 'kg',
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      product: {
+        name: 'Organic Wheat',
+        category: 'Wheat',
+        grade: 'Organic'
+      }
     },
     {
       id: '3',
@@ -349,7 +361,12 @@ function getMockInventory() {
       name: 'Yellow Corn',
       stock: 18400,
       unit: 'kg',
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      product: {
+        name: 'Yellow Corn',
+        category: 'Corn',
+        grade: 'Grade A'
+      }
     },
     {
       id: '4',
@@ -357,7 +374,12 @@ function getMockInventory() {
       name: 'Red Chilli',
       stock: 5230,
       unit: 'kg',
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      product: {
+        name: 'Red Chilli',
+        category: 'Spices',
+        grade: 'Premium'
+      }
     }
   ]
 }
@@ -373,7 +395,7 @@ export async function getMarketPrices() {
     if (error) {
       // If the error is due to table not existing, return mock data
       if (error.code === '42P01') {
-        console.log('Market prices table does not exist, returning mock data')
+        console.warn('Market prices table does not exist, returning mock data')
         return getMockMarketPrices()
       }
       console.error('Error fetching market prices:', error)
@@ -387,7 +409,7 @@ export async function getMarketPrices() {
   }
 }
 
-// Mock market prices data
+// Only used as fallback if database tables don't exist
 function getMockMarketPrices() {
   return [
     {

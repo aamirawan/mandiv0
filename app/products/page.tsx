@@ -17,7 +17,8 @@ interface Product {
   grade: string;
   price: number;
   stock: number;
-  image: string;
+  image?: string;
+  images?: any[];
   created_at: string;
 }
 
@@ -138,7 +139,7 @@ function ProductsList({ view }: ProductsListProps) {
           <div key={product.id} className="bg-white rounded-lg shadow overflow-hidden">
             <div className="p-2 h-48 bg-gray-100 flex items-center justify-center">
               <Image 
-                src={product.image || "/placeholder.svg"} 
+                src={getProductImage(product)} 
                 alt={product.name}
                 width={200}
                 height={150}
@@ -196,7 +197,7 @@ function ProductsList({ view }: ProductsListProps) {
           <div className="col-span-2 flex items-center">
             <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center mr-3">
               <Image 
-                src={product.image || "/placeholder.svg"} 
+                src={getProductImage(product)} 
                 alt={product.name}
                 width={40}
                 height={40}
@@ -222,5 +223,27 @@ function ProductsList({ view }: ProductsListProps) {
       ))}
     </div>
   )
+}
+
+const getProductImage = (product: Product) => {
+  // If there's an image object from Supabase, use it
+  if (product.images && Array.isArray(product.images) && product.images.length > 0) {
+    return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images/${product.images[0]}`
+  }
+  
+  // If there's a specific image path
+  if (product.image) {
+    return product.image
+  }
+  
+  // Otherwise use placeholder based on category
+  const placeholders: Record<string, string> = {
+    'Rice': '/placeholders/rice.jpg',
+    'Wheat': '/placeholders/wheat.jpg',
+    'Corn': '/placeholders/corn.jpg',
+    'Spices': '/placeholders/spices.jpg'
+  }
+  
+  return placeholders[product.category] || '/placeholder.svg'
 }
 
