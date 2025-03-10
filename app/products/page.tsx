@@ -167,7 +167,10 @@ function ProductsList({ view }: ProductsListProps) {
               </div>
               
               <div className="flex justify-between">
-                <button className="bg-white border border-gray-300 text-gray-700 px-3 py-1 rounded-md text-sm flex items-center">
+                <button 
+                  className="bg-white border border-gray-300 text-gray-700 px-3 py-1 rounded-md text-sm flex items-center"
+                  onClick={() => router.push(`/products/edit/${product.id}`)}
+                >
                   <Edit className="h-4 w-4 mr-1" />
                   Edit
                 </button>
@@ -205,18 +208,23 @@ function ProductsList({ view }: ProductsListProps) {
               />
             </div>
             <div>
-              <div className="font-medium">{product.name}</div>
-              <div className="text-xs text-gray-500">{product.category} • {product.grade}</div>
+              <h3 className="font-medium">{product.name}</h3>
+              <p className="text-xs text-gray-500">{product.category} • {product.grade}</p>
             </div>
           </div>
           <div className="text-center">PKR {product.price}/kg</div>
           <div className="text-center">{product.stock} kg</div>
-          <div className="flex justify-center space-x-2">
-            <button className="bg-white border border-gray-300 p-1 rounded">
-              <Edit className="h-4 w-4" />
+          <div className="flex space-x-2">
+            <button 
+              className="bg-white border border-gray-300 text-gray-700 px-3 py-1 rounded-md text-sm flex items-center"
+              onClick={() => router.push(`/products/edit/${product.id}`)}
+            >
+              <Edit className="h-4 w-4 mr-1" />
+              Edit
             </button>
-            <button className="bg-white border border-gray-300 p-1 rounded">
-              <Gavel className="h-4 w-4" />
+            <button className="bg-green-600 text-white px-3 py-1 rounded-md text-sm flex items-center">
+              <Gavel className="h-4 w-4 mr-1" />
+              Auction
             </button>
           </div>
         </div>
