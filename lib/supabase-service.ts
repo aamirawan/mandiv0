@@ -308,32 +308,152 @@ export async function deleteProduct(id: string) {
 // Auctions
 export async function getAuctions() {
   try {
+    console.log('Fetching auctions from Supabase')
+    
+    // Check if auctions table exists
+    try {
+      const { data: tableCheck, error: tableError } = await supabase
+        .from('auctions')
+        .select('count')
+        .limit(1)
+      
+      if (tableError) {
+        console.error('Error checking auctions table:', tableError)
+        if (tableError.code === '42P01') { // PostgreSQL code for undefined_table
+          console.warn('Auctions table does not exist, returning mock data')
+          return getMockAuctions()
+        }
+        throw tableError
+      }
+    } catch (connectionError) {
+      console.error('Failed to connect to Supabase:', connectionError)
+      return getMockAuctions()
+    }
+    
     const { data, error } = await supabase
       .from('auctions')
       .select(`
         *,
         product:product_id (
+          id,
           name,
           category,
-          grade
+          grade,
+          image
         )
       `)
       .order('created_at', { ascending: false })
     
     if (error) {
-      // If the error is due to table not existing, return mock data
-      if (error.code === '42P01') {
-        console.warn('Auctions table does not exist, returning mock data')
-        return getMockAuctions()
-      }
       console.error('Error fetching auctions:', error)
-      return []
+      return getMockAuctions()
     }
     
-    return data || []
+    console.log('Fetched auctions:', data)
+    
+    // Process the auctions to calculate time remaining
+    const processedAuctions = data.map(auction => {
+      const endDate = new Date(auction.end_date)
+      const now = new Date()
+      const timeRemaining = endDate.getTime() - now.getTime()
+      
+      let timeLeft = ''
+      if (timeRemaining <= 0) {
+        timeLeft = 'Ended'
+      } else {
+        const days = Math.floor(timeRemaining / (1000 * 60 * 60 * 24))
+        const hours = Math.floor((timeRemaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+        const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60))
+        
+        if (days > 0) {
+          timeLeft = `${days}d ${hours}h`
+        } else if (hours > 0) {
+          timeLeft = `${hours}h ${minutes}m`
+        } else {
+          timeLeft = `${minutes}m`
+        }
+      }
+      
+      return {
+        ...auction,
+        timeLeft
+      }
+    })
+    
+    return processedAuctions || []
   } catch (error) {
     console.error('Error fetching auctions:', error)
-    return []
+    return getMockAuctions()
+  }
+}
+
+export async function getAuctionById(id: string) {
+  try {
+    console.log('Fetching auction with ID:', id)
+    
+    const { data, error } = await supabase
+      .from('auctions')
+      .select(`
+        *,
+        product:product_id (
+          id,
+          name,
+          category,
+          grade,
+          image
+        )
+      `)
+      .eq('id', id)
+      .single()
+    
+    if (error) {
+      // If the error is due to table not existing, return mock data
+      if (error.code === '42P01') { // PostgreSQL code for undefined_table
+        console.warn('Auctions table does not exist, returning mock data')
+        return getMockAuctions().find(auction => auction.id === id) || null
+      }
+      
+      // If not found, return null
+      if (error.code === 'PGRST116') { // Not found
+        return null
+      }
+      
+      console.error(`Error fetching auction with id ${id}:`, error)
+      return null
+    }
+    
+    console.log('Fetched auction:', data)
+    
+    // Calculate time remaining
+    if (data) {
+      const endDate = new Date(data.end_date)
+      const now = new Date()
+      const timeRemaining = endDate.getTime() - now.getTime()
+      
+      let timeLeft = ''
+      if (timeRemaining <= 0) {
+        timeLeft = 'Ended'
+      } else {
+        const days = Math.floor(timeRemaining / (1000 * 60 * 60 * 24))
+        const hours = Math.floor((timeRemaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+        const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60))
+        
+        if (days > 0) {
+          timeLeft = `${days}d ${hours}h`
+        } else if (hours > 0) {
+          timeLeft = `${hours}h ${minutes}m`
+        } else {
+          timeLeft = `${minutes}m`
+        }
+      }
+      
+      return { ...data, timeLeft }
+    }
+    
+    return data
+  } catch (error) {
+    console.error(`Error fetching auction with id ${id}:`, error)
+    return null
   }
 }
 
@@ -344,45 +464,72 @@ function getMockAuctions() {
       id: '1',
       title: 'Premium Basmati Rice Auction',
       product_id: '1',
-      starting_price: 80,
+      starting_bid: 80,
       current_bid: 85,
       quantity: 500,
-      ends_in: '2h 15m',
+      increment_amount: 5,
+      start_date: new Date().toISOString(),
+      end_date: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(), // 2 hours from now
+      timeLeft: '2h 0m',
+      seller: 'Mandi Marketplace',
+      location: 'Lahore Mandi',
+      status: 'active',
+      description: 'Premium quality basmati rice auction',
       created_at: new Date().toISOString(),
       product: {
+        id: '1',
         name: 'Premium Basmati Rice',
         category: 'Rice',
-        grade: 'Premium'
+        grade: 'Premium',
+        image: '/placeholders/rice.jpg'
       }
     },
     {
       id: '2',
       title: 'Organic Wheat Bulk Sale',
       product_id: '2',
-      starting_price: 30,
+      starting_bid: 30,
       current_bid: 34,
       quantity: 1000,
-      ends_in: '5h 30m',
+      increment_amount: 2,
+      start_date: new Date().toISOString(),
+      end_date: new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString(), // 5 hours from now
+      timeLeft: '5h 0m',
+      seller: 'Mandi Marketplace',
+      location: 'Karachi Mandi',
+      status: 'active',
+      description: 'Certified organic wheat from sustainable farms',
       created_at: new Date().toISOString(),
       product: {
+        id: '2',
         name: 'Organic Wheat',
         category: 'Wheat',
-        grade: 'Organic'
+        grade: 'Organic',
+        image: '/placeholders/wheat.jpg'
       }
     },
     {
       id: '3',
       title: 'Yellow Corn Auction',
       product_id: '3',
-      starting_price: 25,
+      starting_bid: 25,
       current_bid: 28,
       quantity: 750,
-      ends_in: '1d 4h',
+      increment_amount: 1,
+      start_date: new Date().toISOString(),
+      end_date: new Date(Date.now() + 28 * 60 * 60 * 1000).toISOString(), // 28 hours from now
+      timeLeft: '1d 4h',
+      seller: 'Mandi Marketplace',
+      location: 'Faisalabad Mandi',
+      status: 'active',
+      description: 'Fresh yellow corn suitable for various applications',
       created_at: new Date().toISOString(),
       product: {
+        id: '3',
         name: 'Yellow Corn',
         category: 'Corn',
-        grade: 'Grade A'
+        grade: 'Grade A',
+        image: '/placeholders/corn.jpg'
       }
     }
   ]
@@ -390,9 +537,51 @@ function getMockAuctions() {
 
 export async function createAuction(auction: any) {
   try {
+    console.log('Creating auction in Supabase:', auction)
+    
+    // Check if auctions table exists
+    try {
+      const { data: tableCheck, error: tableError } = await supabase
+        .from('auctions')
+        .select('count')
+        .limit(1)
+      
+      if (tableError) {
+        console.error('Error checking auctions table:', tableError)
+        if (tableError.code === '42P01') { // PostgreSQL code for undefined_table
+          console.warn('Auctions table does not exist, returning mock success')
+          return { ...auction, id: `mock-${Date.now()}` }
+        }
+        throw tableError
+      }
+    } catch (connectionError) {
+      console.error('Failed to connect to Supabase:', connectionError)
+      return { ...auction, id: `mock-${Date.now()}` }
+    }
+    
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    // Sanitize the auction data
+    const sanitizedAuction = {
+      product_id: auction.product_id,
+      title: auction.title,
+      description: auction.description || '',
+      quantity: parseInt(auction.quantity),
+      starting_bid: parseFloat(auction.starting_bid),
+      current_bid: auction.current_bid ? parseFloat(auction.current_bid) : null,
+      increment_amount: parseFloat(auction.increment_amount) || 1.00,
+      start_date: auction.start_date,
+      end_date: auction.end_date,
+      seller: auction.seller || user?.email || 'Mandi Marketplace',
+      location: auction.location || '',
+      status: auction.status || 'active',
+      user_id: user?.id
+    }
+    
     const { data, error } = await supabase
       .from('auctions')
-      .insert([auction])
+      .insert([sanitizedAuction])
       .select()
     
     if (error) {
@@ -400,9 +589,68 @@ export async function createAuction(auction: any) {
       return null
     }
     
+    console.log('Auction created successfully:', data)
     return data?.[0] || null
   } catch (error) {
     console.error('Error creating auction:', error)
+    return null
+  }
+}
+
+export async function updateAuction(id: string, updates: any) {
+  try {
+    console.log('Updating auction:', id)
+    console.log('Update data:', updates)
+    
+    // Check if auction exists first
+    const { data: existingAuction, error: fetchError } = await supabase
+      .from('auctions')
+      .select('*')
+      .eq('id', id)
+      .single()
+    
+    if (fetchError) {
+      console.error(`Error checking if auction exists (id: ${id}):`, fetchError)
+      return null
+    }
+    
+    if (!existingAuction) {
+      console.error(`Auction with id ${id} not found`)
+      return null
+    }
+    
+    // Sanitize updates
+    const sanitizedUpdates: any = {}
+    
+    if (updates.title !== undefined) sanitizedUpdates.title = updates.title
+    if (updates.description !== undefined) sanitizedUpdates.description = updates.description
+    if (updates.quantity !== undefined) sanitizedUpdates.quantity = parseInt(updates.quantity)
+    if (updates.starting_bid !== undefined) sanitizedUpdates.starting_bid = parseFloat(updates.starting_bid)
+    if (updates.current_bid !== undefined) sanitizedUpdates.current_bid = parseFloat(updates.current_bid)
+    if (updates.increment_amount !== undefined) sanitizedUpdates.increment_amount = parseFloat(updates.increment_amount)
+    if (updates.start_date !== undefined) sanitizedUpdates.start_date = updates.start_date
+    if (updates.end_date !== undefined) sanitizedUpdates.end_date = updates.end_date
+    if (updates.seller !== undefined) sanitizedUpdates.seller = updates.seller
+    if (updates.location !== undefined) sanitizedUpdates.location = updates.location
+    if (updates.status !== undefined) sanitizedUpdates.status = updates.status
+    
+    console.log('Sanitized updates:', sanitizedUpdates)
+    
+    const { data, error } = await supabase
+      .from('auctions')
+      .update(sanitizedUpdates)
+      .eq('id', id)
+      .select()
+    
+    if (error) {
+      console.error(`Error updating auction with id ${id}:`, error)
+      return null
+    }
+    
+    console.log('Update successful:', data)
+    return data?.[0] || null
+  } catch (error: any) {
+    console.error(`Exception updating auction with id ${id}:`, error.message, error.stack)
     return null
   }
 }
