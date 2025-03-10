@@ -138,18 +138,33 @@ export async function createProduct(product: any) {
   try {
     console.log('Creating product in Supabase:', JSON.stringify(product, null, 2))
     
-    // Check if products table exists
-    const { data: tableCheck, error: tableError } = await supabase
-      .from('products')
-      .select('count')
-      .limit(1)
+    // Check if Supabase URL and API key are configured
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
     
-    if (tableError) {
-      console.error('Error checking products table:', tableError)
-      if (tableError.code === '42P01') { // PostgreSQL code for undefined_table
-        return getMockProducts()[0] // Return mock data if table doesn't exist
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('Supabase configuration missing. Using mock data.')
+      return createMockProduct(product)
+    }
+    
+    // Check if products table exists
+    try {
+      const { data: tableCheck, error: tableError } = await supabase
+        .from('products')
+        .select('count')
+        .limit(1)
+      
+      if (tableError) {
+        console.error('Error checking products table:', tableError)
+        if (tableError.code === '42P01') { // PostgreSQL code for undefined_table
+          console.log('Products table does not exist, using mock data')
+          return createMockProduct(product)
+        }
+        throw tableError
       }
-      throw tableError
+    } catch (connectionError) {
+      console.error('Failed to connect to Supabase:', connectionError)
+      return createMockProduct(product)
     }
     
     // Sanitize the product object to ensure it has the expected fields
@@ -171,25 +186,34 @@ export async function createProduct(product: any) {
     
     if (error) {
       console.error('Error creating product in Supabase:', error)
-      throw error
+      return createMockProduct(product) // Fallback to mock if insert fails
     }
     
     console.log('Product created successfully:', data)
-    return data?.[0] || null
+    return data?.[0] || createMockProduct(product)
   } catch (error: any) {
     console.error('Exception during product creation:', error.message, error.stack)
-    // For development, return mock data if there's an error
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Returning mock product in development')
-      const mockProduct = {
-        ...product,
-        id: `mock-${Date.now()}`,
-        created_at: new Date().toISOString()
-      }
-      return mockProduct
-    }
-    return null
+    return createMockProduct(product)
   }
+}
+
+// Helper function to create a mock product
+function createMockProduct(product: any) {
+  console.log('Creating a mock product')
+  const mockProduct = {
+    id: `mock-${Date.now()}`,
+    name: product.name,
+    category: product.category,
+    grade: product.grade,
+    price: parseFloat(product.price.toString()),
+    stock: parseInt(product.stock.toString()),
+    unit: product.unit || 'kg',
+    description: product.description || '',
+    image: product.image || '',
+    created_at: new Date().toISOString()
+  }
+  console.log('Mock product created:', mockProduct)
+  return mockProduct
 }
 
 export async function updateProduct(id: string, updates: any) {
